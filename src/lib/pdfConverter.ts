@@ -5,7 +5,7 @@ export const convertPdfPageToImage = async (
   pageNumber: number
 ): Promise<string> => {
 
-  const baseUrl = process.env.NEXTAUTH_URL;
+  const baseUrl = process.env.BASE_URL;
 
   const browser = await puppeteer.launch();
   const page: Page = await browser.newPage();
@@ -14,6 +14,8 @@ export const convertPdfPageToImage = async (
   // const viewerPath = path.join(__dirname, "pdf-viewer.html"); // Adjust the path as needed
   const viewerPath = `${baseUrl}/pdf-viewer.html`;
   const pdfApiUrl = `${baseUrl}/api/pdf/${pdfFilename}`;
+
+  console.log(viewerPath, pdfApiUrl, `${viewerPath}?file=${encodeURIComponent(pdfApiUrl)}&page=${pageNumber}`)
 
   await page.goto(
     `${viewerPath}?file=${encodeURIComponent(pdfApiUrl)}&page=${pageNumber}`,
