@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "prebuild": "ts-node -P tsconfig-init.json src/initDatabase.ts",
+    "prebuild": "[ \"$VERCEL\" = \"1\" ] || ts-node -P tsconfig-init.json src/initDatabase.ts",
     "build": "next build",
     "start": "next start",
     "lint": "next lint"

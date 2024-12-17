@@ -1,5 +1,5 @@
 import { Role, User } from "@/types";
-import { MongoClient, ObjectId } from "mongodb";
+import { MongoClient, MongoClientOptions, ObjectId } from "mongodb";
 
 if (!process.env.MONGODB_URI) {
   throw new Error('Invalid/Missing environment variable: "MONGODB_URI"');
@@ -11,9 +11,7 @@ export const USERS_COLLECTION = "users";
 export const ROLES_COLLECTION = "roles";
 export const PERMISSIONS_COLLECTION = "permissions";
 
-/* const options: MongoClientOptions = {
-  serverSelectionTimeoutMS: 5000,
-}; */
+const options: MongoClientOptions = {};
 
 let client: MongoClient;
 let clientPromise: Promise<MongoClient>;
@@ -24,12 +22,12 @@ const globalWithMongo = global as typeof globalThis & {
 
 if (process.env.NODE_ENV === "development") {
   if (!globalWithMongo._mongoClientPromise) {
-    client = new MongoClient(uri /* options */);
+    client = new MongoClient(uri, options);
     globalWithMongo._mongoClientPromise = client.connect();
   }
   clientPromise = globalWithMongo._mongoClientPromise;
 } else {
-  client = new MongoClient(uri /* options */);
+  client = new MongoClient(uri, options);
   clientPromise = client.connect();
 }
 
