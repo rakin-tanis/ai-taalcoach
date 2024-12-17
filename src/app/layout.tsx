@@ -18,8 +18,8 @@ const geistMono = localFont({
 });
 
 export const metadata: Metadata = {
-  title: "Woorden boek",
-  description: " Turks, nederlands vertaal spel",
+  title: "Ai Taalcoach",
+  description: "Ik ben hier om je voor te bereiden op het examen.",
 };
 
 export default function RootLayout({
