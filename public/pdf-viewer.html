@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>PDF Viewer</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.10.377/pdf.min.js"></script>
+    <style>
+        #pdfViewer {
+            width: 100%;
+            height: 100vh;
+            overflow: auto;
+        }
+    </style>
+</head>
+<body>
+    <div id="pdfViewer"></div>
+    <script>
+        const url = new URLSearchParams(window.location.search).get('file');
+        const pageNumber = parseInt(new URLSearchParams(window.location.search).get('page'), 10) || 1; // Get the page number
+        const pdfViewer = document.getElementById('pdfViewer');
+
+        const loadingTask = pdfjsLib.getDocument(url);
+        loadingTask.promise.then(pdf => {
+            pdf.getPage(pageNumber).then(page => {
+                const canvas = document.createElement('canvas');
+                const context = canvas.getContext('2d');
+                const viewport = page.getViewport({ scale: 1.3 });
+                canvas.height = viewport.height;
+                canvas.width = viewport.width;
+                pdfViewer.appendChild(canvas);
+
+                const renderContext = {
+                    canvasContext: context,
+                    viewport: viewport
+                };
+                page.render(renderContext);
+            });
+        });
+    </script>
+</body>
+</html>

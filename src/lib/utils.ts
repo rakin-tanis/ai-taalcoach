@@ -29,3 +29,19 @@ export function checkIsMobile(userAgent?: string): boolean {
 
   return window.innerWidth <= 768 || mobileCheck();
 }
+
+
+// Utility function to convert image to base64
+export async function convertImageToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = () => {
+      // Remove the data URL prefix
+      const base64String = (reader.result as string).split(',')[1];
+      resolve(base64String);
+    };
+    reader.onerror = (error) => reject(error);
+  });
+}
+
