@@ -12,7 +12,7 @@ export const ROLES_COLLECTION = "roles";
 export const PERMISSIONS_COLLECTION = "permissions";
 
 const options: MongoClientOptions = {
-  serverSelectionTimeoutMS: 5000,
+  // serverSelectionTimeoutMS: 5000,
 };
 
 let client: MongoClient;
