@@ -4,8 +4,8 @@ export const convertPdfPageToImage = async (
   pdfFilename: string,
   pageNumber: number
 ): Promise<string> => {
-
   const baseUrl = process.env.BASE_URL;
+  console.log("convertPdfPageToImage ----------" + baseUrl)
 
   const browser = await puppeteer.launch();
   const page: Page = await browser.newPage();
