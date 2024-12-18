@@ -16,7 +16,7 @@ export default async function SSProtectedComponent({
 }: ServerAuthProps) {
   const session = await getServerSession();
   const headerList = await headers();
-  const currentPath = new URL(headerList.get('x-url') || '', process.env.BASE_URL).pathname;
+  const currentPath = new URL(headerList.get('x-url') || '', process.env.NEXT_PUBLIC_BASE_URL).pathname;
   const encodedCallbackUrl = encodeURIComponent(currentPath);
 
   if (!session) {
