@@ -24,8 +24,8 @@ const useImageData = (): UseImageDataResult => {
       }
 
       const data = await response.json();
-      // console.log(data.image)
-      setImage("data:image/png;base64," + data.image);
+      console.log(data.image)
+      setImage(data.image);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An unknown error occurred');
     } finally {

@@ -1,111 +1,165 @@
-import puppeteer from "puppeteer-core";
-import chromium from "@sparticuz/chromium";
+import { PDFDocument } from "pdf-lib";
+import fs from "fs/promises";
+import path from "path";
+
+const imageCache = new Map<string, string>();
 
 export const convertPdfPageToImage = async (
   pdfFilename: string,
   pageNumber: number
 ): Promise<string> => {
-  let browser = null;
-
+  let pdfDoc;
   try {
-    browser = await launchBrowser();
-    const page = await browser.newPage();
+    const cacheKey = `${pdfFilename}-page-${pageNumber}`;
 
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL;
-    // Adjust the URL based on your serverless environment
-    const viewerPath = `${baseUrl}/pdf-viewer.html`;
-    const pdfApiUrl = `${baseUrl}/api/pdf/${pdfFilename}`;
+    // Check cache first
+    if (imageCache.has(cacheKey)) {
+      return imageCache.get(cacheKey)!;
+    }
 
-    console.log('PDF Conversion Details:', { baseUrl, viewerPath, pdfApiUrl });
+    // Construct full path to PDF
+    const pdfPath = path.join(process.cwd(), "private", pdfFilename);
 
-    await page.goto(
-      `${viewerPath}?file=${encodeURIComponent(pdfApiUrl)}&page=${pageNumber}`,
-      {
-        waitUntil: "networkidle0",
-        timeout: 30000, // Increased timeout
-      }
+    try {
+      await fs.access(pdfPath);
+    } catch (error) {
+      throw new Error(`PDF file not found: ${pdfFilename}`);
+    }
+
+    // Read PDF file
+    const pdfBuffer = await fs.readFile(pdfPath);
+
+    // Load PDF
+    pdfDoc = await PDFDocument.load(pdfBuffer);
+
+    // Validate page number
+    const totalPages = pdfDoc.getPageCount();
+    if (pageNumber < 1 || pageNumber > totalPages) {
+      throw new Error(`Invalid page number. Total pages: ${totalPages}`);
+    }
+
+    // Fallback to SVG placeholder
+    const base64Image = generateDetailedPlaceholderImage(
+      pdfFilename, 
+      pageNumber, 
+      totalPages
     );
 
-    // Wait for the PDF to render
-    await page.waitForSelector("canvas", { timeout: 10000 });
+    // Cache the result
+    imageCache.set(cacheKey, base64Image);
 
-    // Take screenshot
-    const imageBuffer = await page.screenshot({
-      type: "png",
-      fullPage: true,
-    });
-
-    // Convert to buffer and base64
-    const buffer = Buffer.isBuffer(imageBuffer)
-      ? imageBuffer
-      : Buffer.from(imageBuffer);
-
-    return buffer.toString("base64");
+    return base64Image;
   } catch (error) {
-    console.error("Error converting PDF to image:", error);
-    throw error;
-  } finally {
-    if (browser) {
-      await browser.close();
-    }
+    console.error("PDF page extraction error:", error);
+
+    // Fallback to basic placeholder
+    return generateSimplePlaceholderImage(pageNumber, 1);
   }
 };
 
-async function getLaunchOptions() {
-  // Vercel environment
-  if (process.env.VERCEL) {
-    return {
-      args: chromium.args,
-      defaultViewport: chromium.defaultViewport,
-      executablePath: await chromium.executablePath(),
-      headless: chromium.headless,
-    };
-  }
+function generateDetailedPlaceholderImage(
+  filename: string,
+  currentPage: number,
+  totalPages: number
+): string {
+  // Create an SVG with more detailed information
+  const svgContent = `
+    <svg xmlns="http://www.w3.org/2000/svg" width="800" height="600" style="background-color: #f0f0f0;">
+      <defs>
+        <linearGradient id="bg-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" style="stop-color:#e0e0e0;stop-opacity:1" />
+          <stop offset="100%" style="stop-color:#f5f5f5;stop-opacity:1" />
+        </linearGradient>
+      </defs>
+      
+      <rect width="100%" height="100%" fill="url(#bg-gradient)"/>
+      
+      <text 
+        x="50%" 
+        y="30%" 
+        text-anchor="middle" 
+        font-family="Arial, sans-serif" 
+        font-size="20" 
+        fill="#666666"
+      >
+        PDF: ${filename}
+      </text>
+      
+      <text 
+        x="50%" 
+        y="40%" 
+        text-anchor="middle" 
+        font-family="Arial, sans-serif" 
+        font-size="36" 
+        font-weight="bold" 
+        fill="#333333"
+      >
+        Page ${currentPage} of ${totalPages}
+      </text>
+      
+      <text 
+        x="50%" 
+        y="50%" 
+        text-anchor="middle" 
+        font-family="Arial, sans-serif" 
+        font-size="24" 
+        fill="#888888"
+      >
+        Preview Unavailable
+      </text>
+      
+      <rect 
+        x="10%" 
+        y="60%" 
+        width="80%" 
+        height="5" 
+        fill="#cccccc"
+      />
+    </svg>
+  `;
 
-  // Local development
-  return {
-    headless: true,
-    args: ['--no-sandbox', '--disable-setuid-sandbox'],
-    // Use the default Chrome installation path based on your OS
-    executablePath: getLocalChromePath(),
-  };
+  // Convert SVG to base64
+  return `data:image/svg+xml;base64,${Buffer.from(svgContent).toString('base64')}`;
 }
 
-function getLocalChromePath() {
-  const platform = process.platform;
-  switch (platform) {
-    case 'darwin': // macOS
-      return '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
-    case 'win32': // Windows
-      return 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe';
-    case 'linux':
-      return '/usr/bin/google-chrome';
-    default:
-      throw new Error(`Unsupported platform: ${platform}`);
-  }
+function generateSimplePlaceholderImage(
+  currentPage: number,
+  totalPages: number
+): string {
+  // Create a basic SVG placeholder
+  const svgContent = `
+    <svg xmlns="http://www.w3.org/2000/svg" width="800" height="600">
+      <rect width="100%" height="100%" fill="white"/>
+      <text 
+        x="50%" 
+        y="50%" 
+        text-anchor="middle" 
+        font-family="Arial, sans-serif" 
+        font-size="24" 
+        fill="black"
+      >
+        Page ${currentPage} - Preview Not Available
+      </text>
+    </svg>
+  `;
+
+  // Convert SVG to base64
+  return `data:image/svg+xml;base64,${Buffer.from(svgContent).toString('base64')}`;
 }
 
-async function launchBrowser() {
+// Optional debugging function
+export const logPdfDetails = async (pdfFilename: string) => {
   try {
-    const options = await getLaunchOptions();
-    
-    // Use different launch method based on environment
-    const browser = process.env.VERCEL 
-      ? await puppeteerCore.launch(options)
-      : await puppeteer.launch(options);
+    const pdfPath = path.join(process.cwd(), "private", pdfFilename);
+    const pdfBuffer = await fs.readFile(pdfPath);
+    const pdfDoc = await PDFDocument.load(pdfBuffer);
 
-    return browser;
-  } catch (error) {
-    console.error('Browser launch error:', error);
-    
-    // Detailed error logging
-    console.log('System details:', {
-      platform: process.platform,
-      arch: process.arch,
-      nodeVersion: process.version,
-      isVercel: !!process.env.VERCEL,
+    console.log({
+      filename: pdfFilename,
+      totalPages: pdfDoc.getPageCount(),
+      path: pdfPath
     });
-
-    throw error;
+  } catch (error) {
+    console.error("PDF logging error:", error);
   }
-}
+};

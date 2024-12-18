@@ -203,7 +203,7 @@ const Question: React.FC = () => {
                   src={image}
                   width={100}
                   height={100}
-                  alt="Picture of the author"
+                  alt="Picture of the question"
                   className='w-full h-auto'
                 />
               )}
