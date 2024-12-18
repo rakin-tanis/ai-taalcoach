@@ -6,6 +6,7 @@ import { useEvaluation } from '@/hooks/useEvaluation';
 import usePdfData from '@/hooks/usePdfData';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import Image from 'next/image'
+import Pagination from './Pagination';
 
 // Custom type for Speech Recognition
 interface CustomSpeechRecognition {
@@ -30,7 +31,7 @@ interface ExtendedWindow extends Window {
   };
 }
 
-const MAX_QUESTION_NUMBER = 175
+const MAX_QUESTION_NUMBER = 350
 
 const Question: React.FC = () => {
   const [questionNumber, setQuestionNumber] = useState(1)
@@ -39,7 +40,7 @@ const Question: React.FC = () => {
   const [recognition, setRecognition] = useState<CustomSpeechRecognition | null>(null);
   const [showResults, setShowResults] = useState(false);
   const { evaluate, isLoading, error, data } = useEvaluation();
-  const { fetchImageData, image, loading: imageLoading, error: imageError } = usePdfData();
+  const { fetchImageData, images, skeletons, loading: imageLoading, error: imageError } = usePdfData();
 
 
   useEffect(() => {
@@ -178,6 +179,14 @@ const Question: React.FC = () => {
     }
   };
 
+  const goToPage = (page: number) => {
+    if (questionNumber > 0 && questionNumber <= MAX_QUESTION_NUMBER) {
+      setQuestionNumber(page);
+      setTranscript("")
+      setShowResults(false)
+    }
+  }
+
   return (
     <div className='flex flex-col items-center relative'>
       <div className='relative w-full max-w-[900px] flex items-center'>
@@ -195,17 +204,26 @@ const Question: React.FC = () => {
 
         <div className='flex-grow relative'>
           {imageLoading
-            ? (<div className='animate-pulse w-[800px] h-[616px] bg-gray-300 mb-4'></div>)
+            ? (skeletons && skeletons.map((skeleton, index) =>
+            (<Image
+              key={index}
+              src={skeleton}
+              alt="question image"
+              width={100}
+              height={100}
+              className="w-[550px]" />
+            )))
             : imageError
               ? (<div>{imageError}</div>)
-              : image && (
-                <Image
-                  src={image}
-                  alt="question image"
-                  width={100}
-                  height={100}
-                  className="w-[900px]" />
-              )
+              : images && images.map((image, index) =>
+              (<Image
+                key={index}
+                src={image}
+                alt="question image"
+                width={100}
+                height={100}
+                className="w-[550px]" />
+              ))
           }
         </div>
 
@@ -221,6 +239,10 @@ const Question: React.FC = () => {
           <ChevronRight className="h-6 w-6" />
         </Button>
       </div>
+
+      {/* Pagination Display */}
+      <Pagination currentPage={questionNumber} totalPages={MAX_QUESTION_NUMBER} onPageChange={goToPage} />
+
       <div className='my-4 md:px-14 px-0 max-w-[900px] w-full'>
         <h3 className='text-sm text-gray-400'>Je antwoord:</h3>
         <textarea
@@ -230,7 +252,7 @@ const Question: React.FC = () => {
           rows={3}
         />
       </div>
-      <div className='flex gap-4 flex-col md:flex-row w-full justify-center max-w-[900px]'>
+      <div className='flex gap-4 flex-col md:flex-row w-full justify-center max-w-[650px]'>
         <Button
           onClick={isRecording ? handleStopRecording : handleStartRecording}
           disabled={!recognition || isLoading || imageLoading}
@@ -245,16 +267,16 @@ const Question: React.FC = () => {
         </Button>
       </div>
       {showResults &&
-        <div className='mt-10 mb-40 md:px-14 max-w-[900px]'>
+        <div className='mt-10 mb-40 md:px-14 max-w-[650px]'>
           {isLoading && <div>Je antwoord wordt geanalyseerd...</div>}
           {error && <div>{error}</div>}
           {data &&
             <div>
-              <h2 className={`${data.answer.result === 'voldoende' ? 'text-green-400' : 'text-red-500'} capitalize text-lg font-bold`}>{data.answer.result}</h2>
+              <h2 className={`${data.answer.result === 'voldoende' ? 'text-green-400' : 'text-red-500'} capitalize underline text-lg font-bold p-4`}>{data.answer.result}</h2>
               {data.answer.feedback}
               <div className='flex flex-col gap-4 mt-4'>
                 {data.answer.possibleAnswers.map(pa => (
-                  <div key={pa} className='bg-green-900 p-2'>- {pa}</div>
+                  <div key={pa} className='bg-green-600 text-white font-semibold p-4'>- {pa}</div>
                 ))}
               </div>
             </div>

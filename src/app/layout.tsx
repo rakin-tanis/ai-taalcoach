@@ -37,7 +37,7 @@ export default function RootLayout({
           <ThemeWrapper>
             <div className="bg-gray-50 dark:bg-gray-800">
               <Navbar></Navbar>
-              <main className="min-h-[calc(100vh-74px)] flex justify-center items-center">
+              <main className="min-h-[calc(100vh-74px)] flex justify-center items-center overflow-y-auto">
                 {children}
               </main>
               <Toaster />
