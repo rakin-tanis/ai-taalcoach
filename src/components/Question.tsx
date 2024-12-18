@@ -1,126 +1,162 @@
 'use client'
 
-import React, { ChangeEvent, useEffect, useState } from 'react';
-import { Button } from './ui/Button';
+import React, { ChangeEvent, useCallback, useEffect, useState } from 'react';
 import { useEvaluation } from '@/hooks/useEvaluation';
 import usePdfData from '@/hooks/usePdfData';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
-import Image from 'next/image'
 import Pagination from './Pagination';
+import MobileDebugger from './MobileDebugger';
+import QuestionImageNavigator from './QuestionImageNavigator';
+import TranscriptInput from './TranscriptInput';
+import RecordingControls from './RecordingControls';
+import EvaluationResults from './EvaluationResults';
+
+// Extend Window interface to include speech recognition
+declare global {
+  interface Window {
+    SpeechRecognition?: {
+      new(): CustomSpeechRecognition;
+    };
+    webkitSpeechRecognition?: {
+      new(): CustomSpeechRecognition;
+    };
+  }
+}
+
 
 // Custom type for Speech Recognition
-interface CustomSpeechRecognition {
+export interface CustomSpeechRecognition {
   continuous: boolean;
   interimResults: boolean;
   lang: string;
   start(): void;
   stop(): void;
   onstart: ((event: Event) => void) | null;
-  onresult: ((event: Event) => void) | null;
-  onerror: ((event: Event) => void) | null;
+  onresult: ((event: SpeechRecognitionEvent) => void) | null;
+  onerror: ((event: SpeechRecognitionEvent) => void) | null;
   onend: ((event: Event) => void) | null;
 }
 
-// Define an interface for the window with potential speech recognition properties
-interface ExtendedWindow extends Window {
-  SpeechRecognition?: {
-    new(): CustomSpeechRecognition;
-  };
-  webkitSpeechRecognition?: {
-    new(): CustomSpeechRecognition;
-  };
+// Custom event type for speech recognition
+interface SpeechRecognitionEvent extends Event {
+  results: SpeechRecognitionResultList;
+  error?: string;
 }
 
-const MAX_QUESTION_NUMBER = 350
+// Type guard for speech recognition
+function isSpeechRecognitionConstructor(obj: unknown): obj is { new(): CustomSpeechRecognition } {
+  return typeof obj === 'function';
+}
+
+const MAX_QUESTION_NUMBER = 350;
 
 const Question: React.FC = () => {
-  const [questionNumber, setQuestionNumber] = useState(1)
+  // State management
+  const [questionNumber, setQuestionNumber] = useState(1);
   const [isRecording, setIsRecording] = useState(false);
   const [transcript, setTranscript] = useState<string>('');
   const [recognition, setRecognition] = useState<CustomSpeechRecognition | null>(null);
   const [showResults, setShowResults] = useState(false);
-  const { evaluate, isLoading, error, data } = useEvaluation();
-  const { fetchImageData, images, skeletons, loading: imageLoading, error: imageError } = usePdfData();
+  const [error, setError] = useState<string | null>(null);
 
+  // Custom hooks
+  const {
+    evaluate,
+    isLoading: isEvaluating,
+    error: evaluationError,
+    data: evaluationData
+  } = useEvaluation();
 
-  useEffect(() => {
-    async function loadPdfAndConvertPageToImage() {
-      try {
-        await fetchImageData(questionNumber)
-      } catch (error) {
-        console.error("Error converting PDF page to image:", error);
-      }
+  const {
+    fetchImageData,
+    images,
+    skeletons,
+    loading: imageLoading,
+    error: imageError
+  } = usePdfData();
+
+  // Memoized image loading function
+  const loadPdfAndConvertPageToImage = useCallback(async () => {
+    try {
+      await fetchImageData(questionNumber);
+    } catch (error) {
+      console.error("Error converting PDF page to image:", error);
     }
+  }, [questionNumber]);
 
-    loadPdfAndConvertPageToImage()
-  }, [questionNumber])
-
-
-  // Type-safe speech recognition availability check
-  const isSpeechRecognitionAvailable = (): boolean => {
-    const extendedWindow = window as ExtendedWindow;
-    return !!(
-      extendedWindow.SpeechRecognition ||
-      extendedWindow.webkitSpeechRecognition
-    );
-  };
-
+  // Image loading effect
   useEffect(() => {
-    // Ensure we're in browser environment
-    if (typeof window !== 'undefined' && isSpeechRecognitionAvailable()) {
-      // Type-safe constructor selection
-      const extendedWindow = window as ExtendedWindow;
-      const SpeechRecognitionConstructor =
-        extendedWindow.SpeechRecognition ||
-        extendedWindow.webkitSpeechRecognition;
+    loadPdfAndConvertPageToImage();
+  }, [loadPdfAndConvertPageToImage]);
 
-      // Ensure SpeechRecognitionConstructor exists before using
-      if (SpeechRecognitionConstructor) {
-        // Create recognition instance
-        const recognitionInstance = new SpeechRecognitionConstructor() as CustomSpeechRecognition;
+  // Speech Recognition Setup Effect
+  useEffect(() => {
+    const setupSpeechRecognition = () => {
+      const SpeechRecognition =
+        window.SpeechRecognition ||
+        window.webkitSpeechRecognition;
 
-        // Rest of your existing configuration...
+      if (!SpeechRecognition || !isSpeechRecognitionConstructor(SpeechRecognition)) {
+        setError('Speech recognition is not supported on this device');
+        return null;
+      }
+
+      try {
+        const recognitionInstance = new SpeechRecognition();
         recognitionInstance.continuous = true;
         recognitionInstance.interimResults = true;
         recognitionInstance.lang = 'nl-NL';
 
-        // Event handlers
-        recognitionInstance.onstart = () => {
-          setIsRecording(true);
-          setTranscript('');
-        };
+        // Error Handling
+        recognitionInstance.onerror = (event: SpeechRecognitionEvent) => {
+          console.error('Speech Recognition Error', event);
 
-        recognitionInstance.onresult = (event: Event) => {
-          // Type-safe extraction of transcript
-          const speechEvent = event as unknown as {
-            results: ArrayLike<{
-              0: { transcript: string }
-            }>
+          const errorMessages: Record<string, string> = {
+            'no-speech': 'No speech was detected. Please speak into the microphone.',
+            'audio-capture': 'No microphone was found. Ensure microphone is connected.',
+            'not-allowed': 'Permission to use microphone was denied. Please check browser settings.',
+            'network': 'Network error occurred during speech recognition.',
           };
 
-          const results = speechEvent.results;
-          const currentTranscript = Array.from(results)
-            .map(result => result[0].transcript)
-            .join('');
-
-          setTranscript(currentTranscript);
+          const errorKey = event.error || 'default';
+          setError(errorMessages[errorKey] || 'An unknown error occurred during speech recognition.');
+          setIsRecording(false);
         };
 
-        recognitionInstance.onerror = (event: Event) => {
-          console.error('Speech recognition error:', event);
-          setIsRecording(false);
+        // Event Handlers
+        recognitionInstance.onstart = () => {
+          setIsRecording(true);
+          setError(null);
         };
 
         recognitionInstance.onend = () => {
           setIsRecording(false);
         };
 
-        setRecognition(recognitionInstance);
-      } else {
-        console.warn('Speech recognition not supported');
+        recognitionInstance.onresult = (event: Event) => {
+          const speechEvent = event as unknown as {
+            results: ArrayLike<{
+              0: { transcript: string }
+            }>
+          };
+
+          const currentTranscript = Array.from(speechEvent.results)
+            .map(result => result[0].transcript)
+            .join('');
+
+          setTranscript(currentTranscript);
+        };
+
+        return recognitionInstance;
+      } catch (setupError) {
+        console.error('Error setting up speech recognition', setupError);
+        setError('Could not set up speech recognition');
+        return null;
       }
-    }
-    // Cleanup function
+    };
+
+    const recognitionInstance = setupSpeechRecognition();
+    setRecognition(recognitionInstance);
+
     return () => {
       if (recognition) {
         recognition.stop();
@@ -128,21 +164,43 @@ const Question: React.FC = () => {
     };
   }, []);
 
-  const handleStartRecording = () => {
-    if (recognition) {
+  // Event Handlers
+  const handleStartRecording = async (checkPermission: () => Promise<boolean>) => {
+    setError(null);
+
+    if (!recognition) {
+      setError('Speech recognition is not supported');
+      return;
+    }
+
+    const hasPermission = await checkPermission();
+    if (!hasPermission) {
+      setError('Microphone access is required');
+      return;
+    }
+
+    try {
       recognition.start();
+    } catch (startError) {
+      console.error('Error starting speech recognition', startError);
+      setError('Could not start speech recognition');
     }
   };
 
   const handleStopRecording = () => {
     if (recognition) {
-      recognition.stop();
+      try {
+        recognition.stop();
+      } catch (stopError) {
+        console.error('Error stopping speech recognition', stopError);
+        setError('Could not stop speech recognition');
+      }
     }
   };
 
   const handleChange = (event: ChangeEvent<HTMLTextAreaElement>) => {
-    setTranscript(event.target.value)
-  }
+    setTranscript(event.target.value);
+  };
 
   const handleSubmit = async () => {
     if (!transcript) {
@@ -150,167 +208,100 @@ const Question: React.FC = () => {
       return;
     }
 
-    setShowResults(true)
+    setShowResults(true);
     try {
-      const result = await evaluate(questionNumber, transcript)
-      console.log(result)
-
+      await evaluate(questionNumber, transcript);
     } catch (error) {
       console.error('Error:', error);
       alert('An error occurred while processing your answer. Please try again.');
     }
   };
 
-  // Handlers for Previous and Next buttons
   const handlePrevious = () => {
     if (questionNumber > 1) {
       setQuestionNumber(prev => prev - 1);
-      setTranscript("")
-      setShowResults(false);
+      resetQuestionState();
     }
   };
 
   const handleNext = () => {
-    // Assuming you have a maximum number of questions, e.g., 5
-    if (questionNumber <= MAX_QUESTION_NUMBER) {
+    if (questionNumber < MAX_QUESTION_NUMBER) {
       setQuestionNumber(prev => prev + 1);
-      setTranscript("")
-      setShowResults(false)
+      resetQuestionState();
     }
   };
 
   const goToPage = (page: number) => {
-    if (questionNumber > 0 && questionNumber <= MAX_QUESTION_NUMBER) {
+    if (page > 0 && page <= MAX_QUESTION_NUMBER) {
       setQuestionNumber(page);
-      setTranscript("")
-      setShowResults(false)
+      resetQuestionState();
     }
-  }
+  };
+
+  const resetQuestionState = () => {
+    setTranscript('');
+    setShowResults(false);
+  };
 
   return (
     <div className='flex flex-col items-center relative'>
-      <div className='relative w-full max-w-[900px] flex items-center'>
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={handlePrevious}
-          disabled={questionNumber === 1 || isLoading || imageLoading}
-          className='absolute left-0 top-1/2 transform -translate-y-1/2 z-10 
-                     md:relative md:mr-4 
-                     bg-white/50 dark:bg-black/50 rounded-full shadow-md'
-        >
-          <ChevronLeft className="h-6 w-6" />
-        </Button>
+      {/* Image Navigator */}
+      <QuestionImageNavigator
+        questionNumber={questionNumber}
+        images={images}
+        skeletons={skeletons}
+        imageLoading={imageLoading}
+        imageError={imageError}
+        isLoading={isEvaluating}
+        handlePrevious={handlePrevious}
+        handleNext={handleNext}
+      />
 
-        <div className='flex-grow relative'>
-          {imageLoading
-            ? (skeletons && skeletons.map((skeleton, index) =>
-            (<Image
-              key={index}
-              src={skeleton}
-              alt="question image"
-              width={100}
-              height={100}
-              className="w-[550px]" />
-            )))
-            : imageError
-              ? (<div>{imageError}</div>)
-              : images && images.map((image, index) =>
-              (<Image
-                key={index}
-                src={image}
-                alt="question image"
-                width={100}
-                height={100}
-                className="w-[550px]" />
-              ))
-          }
+      {/* Pagination */}
+      <Pagination
+        currentPage={questionNumber}
+        totalPages={MAX_QUESTION_NUMBER}
+        onPageChange={goToPage}
+      />
+
+      {/* Error Display */}
+      {error && (
+        <div className="w-full max-w-[550px] mb-4 p-3 bg-red-50 border border-red-300 rounded-md text-red-700">
+          {error}
         </div>
+      )}
 
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={handleNext}
-          disabled={questionNumber === MAX_QUESTION_NUMBER || isLoading || imageLoading}
-          className='absolute right-0 top-1/2 transform -translate-y-1/2 z-10 
-                     md:relative md:ml-4 
-                     bg-white/50 dark:bg-black/50 rounded-full shadow-md'
-        >
-          <ChevronRight className="h-6 w-6" />
-        </Button>
-      </div>
+      {/* Transcript Input */}
+      <TranscriptInput
+        transcript={transcript}
+        handleChange={handleChange}
+      />
 
-      {/* Pagination Display */}
-      <Pagination currentPage={questionNumber} totalPages={MAX_QUESTION_NUMBER} onPageChange={goToPage} />
+      {/* Recording Controls */}
+      <RecordingControls
+        isRecording={isRecording}
+        recognition={recognition}
+        transcript={transcript}
+        isLoading={isEvaluating}
+        imageLoading={imageLoading}
+        handleStartRecording={handleStartRecording}
+        handleStopRecording={handleStopRecording}
+        handleSubmit={handleSubmit}
+      />
 
-      <div className='my-4 md:px-14 px-0 max-w-[900px] w-full'>
-        <h3 className='text-sm text-gray-400'>Je antwoord:</h3>
-        <textarea
-          value={transcript}
-          onChange={handleChange}
-          className='w-full border-none p-2 dark:bg-gray-700'
-          rows={3}
+      {/* Evaluation Results */}
+      {showResults && (
+        <EvaluationResults
+          isLoading={isEvaluating}
+          evaluationError={evaluationError}
+          data={evaluationData}
         />
-      </div>
-      <div className='flex gap-4 flex-col md:flex-row w-full justify-center max-w-[650px]'>
-        <Button
-          onClick={isRecording ? handleStopRecording : handleStartRecording}
-          disabled={!recognition || isLoading || imageLoading}
-        >
-          {isRecording ? 'Stop Recording' : 'Start Recording'}
-        </Button>
-        <Button
-          onClick={handleSubmit}
-          disabled={!transcript || isLoading || imageLoading}
-        >
-          Submit Answer
-        </Button>
-      </div>
-      {showResults &&
-        <div className='mt-10 mb-40 md:px-14 max-w-[650px]'>
-          {isLoading && <div>Je antwoord wordt geanalyseerd...</div>}
-          {error && <div>{error}</div>}
-          {data &&
-            <div>
-              <h2 className={`${data.answer.result === 'voldoende' ? 'text-green-400' : 'text-red-500'} capitalize underline text-lg font-bold p-4`}>{data.answer.result}</h2>
-              {data.answer.feedback}
-              <div className='flex flex-col gap-4 mt-4'>
-                {data.answer.possibleAnswers.map(pa => (
-                  <div key={pa} className='bg-green-600 text-white font-semibold p-4'>- {pa}</div>
-                ))}
-              </div>
-            </div>
-          }
-        </div>
-      }
+      )}
+
+      {/* Mobile Debugger for Non-Production */}
+      {process.env.NODE_ENV !== 'production' && <MobileDebugger />}
     </div>
   );
 };
 
 export default Question;
-
-
-
-/* 
-
-<iframe
-                  src={pdf} // Assuming `pdf` is the URL or base64 string of the PDF
-                  width="800"
-                  height="616"
-                  className='w-[800px] h-[616px]'
-                  title="PDF Document"
-                /> 
-
-                <embed src={pdf} type="application/pdf" width="800"
-                  height="616"
-                  className='w-[800px] h-[616px]'/>
-
-                  <embed
-                  src={pdf}
-                  type="application/pdf"
-                  width="800"
-                  height="616"
-                  className='w-[800px] h-[616px]'
-                />
-                
-*/

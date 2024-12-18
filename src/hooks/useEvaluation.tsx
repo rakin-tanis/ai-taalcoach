@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-interface EvaluationResponse {
+export interface EvaluationResponse {
   answer: {
     feedback: string;
     result: "voldoende" | "onvoldoende";

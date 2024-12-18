@@ -18,8 +18,7 @@ export async function POST(req: NextRequest) {
       questionNumber * 2,
     );
     const answer = await evaluateAnswer(imageDataUrl, studentAnswer);
-    console.log("answer");
-    console.log(answer);
+
     return NextResponse.json({ answer, result: "success" }, { status: 201 });
   } catch (error) {
     console.error("Error creating role:", error);

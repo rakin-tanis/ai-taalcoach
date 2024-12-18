@@ -143,7 +143,6 @@ const usePdfData = (): UsePdfDataResult => {
 
       setImages(convertedImages);
 
-      console.log(data)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An unknown error occurred');
     } finally {
