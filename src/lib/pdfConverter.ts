@@ -1,6 +1,7 @@
 import { PDFDocument } from "pdf-lib";
 import fs from "fs/promises";
 import path from "path";
+import pdf2pic from "pdf2pic";
 
 const imageCache = new Map<string, string>();
 
@@ -23,6 +24,7 @@ export const convertPdfPageToImage = async (
     try {
       await fs.access(pdfPath);
     } catch (error) {
+      console.log(`PDF file not found: ${pdfFilename}`, error);
       throw new Error(`PDF file not found: ${pdfFilename}`);
     }
 
@@ -61,8 +63,6 @@ async function renderPdfPageToBase64(
   pdfPath: string,
   pageNumber: number
 ): Promise<string> {
-  // Use a PDF rendering library like pdf2pic
-  const pdf2pic = require("pdf2pic");
 
   const options = {
     density: 100,
