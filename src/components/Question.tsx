@@ -5,6 +5,7 @@ import { Button } from './ui/Button';
 import { useEvaluation } from '@/hooks/useEvaluation';
 import usePdfData from '@/hooks/usePdfData';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
+import Image from 'next/image'
 
 // Custom type for Speech Recognition
 interface CustomSpeechRecognition {
@@ -38,7 +39,7 @@ const Question: React.FC = () => {
   const [recognition, setRecognition] = useState<CustomSpeechRecognition | null>(null);
   const [showResults, setShowResults] = useState(false);
   const { evaluate, isLoading, error, data } = useEvaluation();
-  const { fetchImageData, pdf, loading: pdfLoading, error: pdfError } = usePdfData();
+  const { fetchImageData, image, loading: imageLoading, error: imageError } = usePdfData();
 
 
   useEffect(() => {
@@ -184,7 +185,7 @@ const Question: React.FC = () => {
           variant="ghost"
           size="icon"
           onClick={handlePrevious}
-          disabled={questionNumber === 1 || isLoading || pdfLoading}
+          disabled={questionNumber === 1 || isLoading || imageLoading}
           className='absolute left-0 top-1/2 transform -translate-y-1/2 z-10 
                      md:relative md:mr-4 
                      bg-white/50 dark:bg-black/50 rounded-full shadow-md'
@@ -193,15 +194,17 @@ const Question: React.FC = () => {
         </Button>
 
         <div className='flex-grow relative'>
-          {pdfLoading
+          {imageLoading
             ? (<div className='animate-pulse w-[800px] h-[616px] bg-gray-300 mb-4'></div>)
-            : pdfError
-              ? (<div>{pdfError}</div>)
-              : pdf && (
-
-                <embed src={pdf} type="application/pdf" width="800"
-                  height="616"
-                  className='w-[800px] h-[616px]'/>
+            : imageError
+              ? (<div>{imageError}</div>)
+              : image && (
+                <Image
+                  src={image}
+                  alt="question image"
+                  width={100}
+                  height={100}
+                  className="w-[900px]" />
               )
           }
         </div>
@@ -210,7 +213,7 @@ const Question: React.FC = () => {
           variant="ghost"
           size="icon"
           onClick={handleNext}
-          disabled={questionNumber === MAX_QUESTION_NUMBER || isLoading || pdfLoading}
+          disabled={questionNumber === MAX_QUESTION_NUMBER || isLoading || imageLoading}
           className='absolute right-0 top-1/2 transform -translate-y-1/2 z-10 
                      md:relative md:ml-4 
                      bg-white/50 dark:bg-black/50 rounded-full shadow-md'
@@ -230,13 +233,13 @@ const Question: React.FC = () => {
       <div className='flex gap-4 flex-col md:flex-row w-full justify-center max-w-[900px]'>
         <Button
           onClick={isRecording ? handleStopRecording : handleStartRecording}
-          disabled={!recognition || isLoading || pdfLoading}
+          disabled={!recognition || isLoading || imageLoading}
         >
           {isRecording ? 'Stop Recording' : 'Start Recording'}
         </Button>
         <Button
           onClick={handleSubmit}
-          disabled={!transcript || isLoading || pdfLoading}
+          disabled={!transcript || isLoading || imageLoading}
         >
           Submit Answer
         </Button>
@@ -275,5 +278,17 @@ export default Question;
                   className='w-[800px] h-[616px]'
                   title="PDF Document"
                 /> 
+
+                <embed src={pdf} type="application/pdf" width="800"
+                  height="616"
+                  className='w-[800px] h-[616px]'/>
+
+                  <embed
+                  src={pdf}
+                  type="application/pdf"
+                  width="800"
+                  height="616"
+                  className='w-[800px] h-[616px]'
+                />
                 
 */

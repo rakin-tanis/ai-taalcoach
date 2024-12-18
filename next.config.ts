@@ -28,6 +28,12 @@ const nextConfig: NextConfig = {
     // Return an empty array in production
     return [];
   },
+  webpack: (config) => {
+    config.externals.push({
+      'pdfjs-dist/build/pdf.worker.entry': 'commonjs pdfjs-dist/build/pdf.worker.entry'
+    });
+    return config;
+  }
 };
 
 export default nextConfig;
