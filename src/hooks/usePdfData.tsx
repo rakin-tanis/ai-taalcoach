@@ -1,14 +1,14 @@
 import { useState } from 'react';
 
-interface UseImageDataResult {
-  image: string | null;
+interface UsePdfDataResult {
+  pdf: string | null;
   loading: boolean;
   error: string | null;
   fetchImageData: (questionNumber: number) => Promise<void>
 }
 
-const useImageData = (): UseImageDataResult => {
-  const [image, setImage] = useState<string | null>(null);
+const usePdfData = (): UsePdfDataResult => {
+  const [pdf, setPdf] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -24,8 +24,9 @@ const useImageData = (): UseImageDataResult => {
       }
 
       const data = await response.json();
-      console.log(data.image)
-      setImage(data.image);
+
+      setPdf(data.pdf);
+      console.log(data)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An unknown error occurred');
     } finally {
@@ -33,7 +34,7 @@ const useImageData = (): UseImageDataResult => {
     }
   };
 
-  return { fetchImageData, image, loading, error };
+  return { fetchImageData, pdf, loading, error };
 };
 
-export default useImageData;
+export default usePdfData;

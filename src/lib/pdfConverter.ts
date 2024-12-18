@@ -1,11 +1,10 @@
-import { PDFDocument } from "pdf-lib";
+import { PDFDocument, rgb } from "pdf-lib";
 import fs from "fs/promises";
 import path from "path";
-import pdf2pic from "pdf2pic";
 
 const imageCache = new Map<string, string>();
 
-export const convertPdfPageToImage = async (
+export const extractPdfPage = async (
   pdfFilename: string,
   pageNumber: number
 ): Promise<string> => {
@@ -35,23 +34,29 @@ export const convertPdfPageToImage = async (
     pdfDoc = await PDFDocument.load(pdfBuffer);
 
     // Validate page number
-    const totalPages = pdfDoc.getPageCount();
-    if (pageNumber < 1 || pageNumber > totalPages) {
-      throw new Error(`Invalid page number. Total pages: ${totalPages}`);
+    const pages = pdfDoc.getPages();
+    const pagesCount = pages.length;
+    if (pageNumber < 1 || pageNumber > pagesCount) {
+      throw new Error(`Invalid page number. Total pages: ${pagesCount}`);
     }
 
     // Fallback to SVG placeholder
-    const base64Image = await renderPdfPageToBase64(pdfPath, pageNumber);
+    // Create a new PDF document
+    const newPdfDoc = await PDFDocument.create();
+    const [copiedPage] = await newPdfDoc.copyPages(pdfDoc, [pageNumber - 1]); // pageNumber is 1-based, but copyPages uses 0-based index
+    newPdfDoc.addPage(copiedPage);
+    const newPdfBytes = await newPdfDoc.save();
+    const base64String = uint8ArrayToBase64(newPdfBytes);
 
     // Cache the result
-    imageCache.set(cacheKey, base64Image);
+    imageCache.set(cacheKey, base64String);
 
-    return base64Image;
+    return base64String;
   } catch (error) {
     console.error("PDF page extraction error:", error);
 
     // Fallback to detailed placeholder
-    return generateDetailedPlaceholderImage(
+    return generatePdfPlaceholder(
       pdfFilename,
       pageNumber,
       pdfDoc?.getPageCount() || 1
@@ -59,116 +64,69 @@ export const convertPdfPageToImage = async (
   }
 };
 
-async function renderPdfPageToBase64(
-  pdfPath: string,
-  pageNumber: number
-): Promise<string> {
-
-  const options = {
-    density: 100,
-    saveFilename: `page-${pageNumber}`,
-    savePath: "./temp",
-    format: "png",
-    width: 1200,
-    height: 1600,
-  };
-
-  const storeAsImage = pdf2pic.fromPath(pdfPath, options);
-  const pageImage = await storeAsImage(pageNumber);
-
-  if (!pageImage || !pageImage.path) {
-    throw new Error("Failed to convert PDF page to image");
-  }
-
-  // Read the generated image and convert to base64
-  const imageBuffer = await fs.readFile(pageImage.path);
-
-  // Clean up temporary file
-  await fs.unlink(pageImage.path);
-
-  return `data:image/png;base64,${imageBuffer.toString("base64")}`;
-}
-
-function generateDetailedPlaceholderImage(
+export const generatePdfPlaceholder = async (
   filename: string,
   currentPage: number,
   totalPages: number
-): string {
-  // Create an SVG with more detailed information
-  const svgContent = `
-    <svg xmlns="http://www.w3.org/2000/svg" width="800" height="600" style="background-color: #f0f0f0;">
-      <defs>
-        <linearGradient id="bg-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" style="stop-color:#e0e0e0;stop-opacity:1" />
-          <stop offset="100%" style="stop-color:#f5f5f5;stop-opacity:1" />
-        </linearGradient>
-      </defs>
-      
-      <rect width="100%" height="100%" fill="url(#bg-gradient)"/>
-      
-      <text 
-        x="50%" 
-        y="30%" 
-        text-anchor="middle" 
-        font-family="Arial, sans-serif" 
-        font-size="20" 
-        fill="#666666"
-      >
-        PDF: ${filename}
-      </text>
-      
-      <text 
-        x="50%" 
-        y="40%" 
-        text-anchor="middle" 
-        font-family="Arial, sans-serif" 
-        font-size="36" 
-        font-weight="bold" 
-        fill="#333333"
-      >
-        Page ${currentPage} of ${totalPages}
-      </text>
-      
-      <text 
-        x="50%" 
-        y="50%" 
-        text-anchor="middle" 
-        font-family="Arial, sans-serif" 
-        font-size="24" 
-        fill="#888888"
-      >
-        Preview Unavailable
-      </text>
-      
-      <rect 
-        x="10%" 
-        y="60%" 
-        width="80%" 
-        height="5" 
-        fill="#cccccc"
-      />
-    </svg>
-  `;
+): Promise<string> => {
+  // Create a new PDF document
+  const pdfDoc = await PDFDocument.create();
 
-  // Convert SVG to base64
-  return `data:image/svg+xml;base64,${Buffer.from(svgContent).toString(
-    "base64"
-  )}`;
-}
+  // Add a blank page
+  const page = pdfDoc.addPage([800, 600]); // Width: 800, Height: 600
 
-// Optional debugging function
-export const logPdfDetails = async (pdfFilename: string) => {
-  try {
-    const pdfPath = path.join(process.cwd(), "private", pdfFilename);
-    const pdfBuffer = await fs.readFile(pdfPath);
-    const pdfDoc = await PDFDocument.load(pdfBuffer);
+  // Draw a background rectangle
+  page.drawRectangle({
+    x: 0,
+    y: 0,
+    width: 800,
+    height: 600,
+    color: rgb(0.941, 0.941, 0.941), // Light gray background
+  });
 
-    console.log({
-      filename: pdfFilename,
-      totalPages: pdfDoc.getPageCount(),
-      path: pdfPath,
-    });
-  } catch (error) {
-    console.error("PDF logging error:", error);
-  }
+  // Add text for the filename
+  page.drawText(`PDF: ${filename}`, {
+    x: 50,
+    y: 500,
+    size: 20,
+    color: rgb(0.4, 0.4, 0.4), // Dark gray
+  });
+
+  // Add text for the current page and total pages without specifying a font
+  page.drawText(`Page ${currentPage} of ${totalPages}`, {
+    x: 50,
+    y: 450,
+    size: 36,
+    color: rgb(0.2, 0.2, 0.2), // Darker gray
+  });
+
+  // Add text for the unavailable preview message
+  page.drawText("Preview Unavailable", {
+    x: 50,
+    y: 400,
+    size: 24,
+    color: rgb(0.533, 0.533, 0.533), // Medium gray
+  });
+
+  // Draw a horizontal line
+  page.drawLine({
+    start: { x: 80, y: 350 },
+    end: { x: 720, y: 350 },
+    thickness: 5,
+    color: rgb(0.8, 0.8, 0.8), // Light gray line
+  });
+
+  // Serialize the PDF document to bytes (Buffer)
+  const pdfBytes = await pdfDoc.save();
+  const base64String = uint8ArrayToBase64(pdfBytes);
+
+  return base64String;
+};
+
+const uint8ArrayToBase64 = (uint8Array: Uint8Array) => {
+  // Convert Uint8Array to a string
+  const binaryString = String.fromCharCode(...uint8Array);
+  const prefix = 'data:application/pdf;base64,';
+  // Convert the binary string to Base64
+  return prefix + btoa(binaryString);
 };

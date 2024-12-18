@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { convertPdfPageToImage } from "@/lib/pdfConverter";
+import { extractPdfPage } from "@/lib/pdfConverter";
 
 export async function GET(req: NextRequest) {
   try {
@@ -7,14 +7,12 @@ export async function GET(req: NextRequest) {
     const questionNumber = parseInt(searchParams.get("questionNumber") || "1");
 
     // Call the convertPdfPageToImage function
-    console.log("get image ----------")
-    const imageDataUrl = await convertPdfPageToImage(
+    const pdfBase64String = await extractPdfPage(
       "SprekenAdAppel.pdf",
       questionNumber * 2 - 1
     );
-    console.log("get image ----------" + imageDataUrl.substring(0, 30))
 
-    return NextResponse.json({ image: imageDataUrl });
+    return NextResponse.json({ pdf: pdfBase64String });
   } catch (err) {
     console.error("Failed to fetch question:", err);
     return NextResponse.json(

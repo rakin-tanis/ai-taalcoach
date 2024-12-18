@@ -1,5 +1,5 @@
 import { evaluateAnswer } from "@/lib/gemini";
-import { convertPdfPageToImage } from "@/lib/pdfConverter";
+import { extractPdfPage } from "@/lib/pdfConverter";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(req: NextRequest) {
@@ -13,7 +13,7 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       );
     }
-    const imageDataUrl = await convertPdfPageToImage(
+    const imageDataUrl = await extractPdfPage(
       'SprekenAdAppel.pdf',
       questionNumber * 2,
     );

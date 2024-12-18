@@ -7,7 +7,7 @@ interface EvaluationResult {
 }
 
 export async function evaluateAnswer(
-  imageBase64: string,
+  pdfBase64: string, // Change parameter name to reflect that it's a PDF
   studentAnswer: string
 ): Promise<EvaluationResult> {
   if (!process.env.GEMINI_API_KEY) {
@@ -20,13 +20,13 @@ export async function evaluateAnswer(
     model: "gemini-1.5-flash", // This model supports image + text inputs
   });
 
-  // Ensure the imageBase64 is in the correct format
-  if (imageBase64.startsWith("data:image/")) {
+  // Ensure the pdfBase64 is in the correct format
+  if (pdfBase64.startsWith("data:application/pdf;base64,")) {
     // Extract only the Base64 part
-    imageBase64 = imageBase64.split(",")[1];
+    pdfBase64 = pdfBase64.split(",")[1];
   }
 
-  /// Prepare the prompt to explicitly request JSON format
+  // Prepare the prompt to explicitly request JSON format
   const prompt = `Evalueer het antwoord van de student met speciale aandacht voor het taalniveau van de voorbeeldafbeelding.
 
     Beantwoord ALLEEN in de volgende strikte JSON-indeling:
@@ -75,8 +75,8 @@ export async function evaluateAnswer(
             { text: prompt },
             {
               inlineData: {
-                mimeType: "image/png",
-                data: imageBase64,
+                mimeType: "application/pdf", // Change MIME type to PDF
+                data: pdfBase64, // Use the PDF base64 data
               },
             },
           ],
