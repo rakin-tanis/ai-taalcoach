@@ -117,13 +117,47 @@ const RecordingControls: React.FC<RecordingControlsProps> = ({
         };
 
         recognitionInstance.onresult = (event: SpeechRecognitionEvent) => {
-          const results = event.results;
-          const currentTranscript = Array.from(results)
-            .map(result => result[0].transcript)
-            .join('');
+          if (isMobile) {
+            const results = event.results;
+            let finalTranscript = '';
 
-          setTranscript(currentTranscript);
-          onTranscriptChange(currentTranscript);
+            // Collect all final results
+            for (let i = 0; i < results.length; i++) {
+              const result = results[i];
+
+              if (result.isFinal) {
+                const transcript = result[0].transcript.trim();
+
+                // Avoid duplicate or fragmented entries
+                if (transcript && !finalTranscript.includes(transcript)) {
+                  finalTranscript += (finalTranscript ? ' ' : '') + transcript;
+                }
+              }
+            }
+
+            // Clean and deduplicate
+            const cleanedTranscript = finalTranscript
+              .split(' ')
+              .filter((word, index, self) =>
+                self.indexOf(word) === index && word.length > 0
+              )
+              .join(' ')
+              .trim();
+
+            if (cleanedTranscript) {
+              setTranscript(cleanedTranscript);
+              onTranscriptChange(cleanedTranscript);
+            }
+          } else {
+            // Existing desktop logic
+            const results = event.results;
+            const currentTranscript = Array.from(results)
+              .map(result => result[0].transcript)
+              .join('');
+
+            setTranscript(currentTranscript);
+            onTranscriptChange(currentTranscript);
+          }
         };
 
         return recognitionInstance;
