@@ -39,11 +39,7 @@ export const convertPdfPageToImage = async (
     }
 
     // Fallback to SVG placeholder
-    const base64Image = generateDetailedPlaceholderImage(
-      pdfFilename, 
-      pageNumber, 
-      totalPages
-    );
+    const base64Image = await renderPdfPageToBase64(pdfPath, pageNumber);
 
     // Cache the result
     imageCache.set(cacheKey, base64Image);
@@ -52,10 +48,46 @@ export const convertPdfPageToImage = async (
   } catch (error) {
     console.error("PDF page extraction error:", error);
 
-    // Fallback to basic placeholder
-    return generateSimplePlaceholderImage(pageNumber, 1);
+    // Fallback to detailed placeholder
+    return generateDetailedPlaceholderImage(
+      pdfFilename,
+      pageNumber,
+      pdfDoc?.getPageCount() || 1
+    );
   }
 };
+
+async function renderPdfPageToBase64(
+  pdfPath: string,
+  pageNumber: number
+): Promise<string> {
+  // Use a PDF rendering library like pdf2pic
+  const pdf2pic = require("pdf2pic");
+
+  const options = {
+    density: 100,
+    saveFilename: `page-${pageNumber}`,
+    savePath: "./temp",
+    format: "png",
+    width: 1200,
+    height: 1600,
+  };
+
+  const storeAsImage = pdf2pic.fromPath(pdfPath, options);
+  const pageImage = await storeAsImage(pageNumber);
+
+  if (!pageImage || !pageImage.path) {
+    throw new Error("Failed to convert PDF page to image");
+  }
+
+  // Read the generated image and convert to base64
+  const imageBuffer = await fs.readFile(pageImage.path);
+
+  // Clean up temporary file
+  await fs.unlink(pageImage.path);
+
+  return `data:image/png;base64,${imageBuffer.toString("base64")}`;
+}
 
 function generateDetailedPlaceholderImage(
   filename: string,
@@ -119,32 +151,9 @@ function generateDetailedPlaceholderImage(
   `;
 
   // Convert SVG to base64
-  return `data:image/svg+xml;base64,${Buffer.from(svgContent).toString('base64')}`;
-}
-
-function generateSimplePlaceholderImage(
-  currentPage: number,
-  totalPages: number
-): string {
-  // Create a basic SVG placeholder
-  const svgContent = `
-    <svg xmlns="http://www.w3.org/2000/svg" width="800" height="600">
-      <rect width="100%" height="100%" fill="white"/>
-      <text 
-        x="50%" 
-        y="50%" 
-        text-anchor="middle" 
-        font-family="Arial, sans-serif" 
-        font-size="24" 
-        fill="black"
-      >
-        Page ${currentPage} - Preview Not Available
-      </text>
-    </svg>
-  `;
-
-  // Convert SVG to base64
-  return `data:image/svg+xml;base64,${Buffer.from(svgContent).toString('base64')}`;
+  return `data:image/svg+xml;base64,${Buffer.from(svgContent).toString(
+    "base64"
+  )}`;
 }
 
 // Optional debugging function
@@ -157,7 +166,7 @@ export const logPdfDetails = async (pdfFilename: string) => {
     console.log({
       filename: pdfFilename,
       totalPages: pdfDoc.getPageCount(),
-      path: pdfPath
+      path: pdfPath,
     });
   } catch (error) {
     console.error("PDF logging error:", error);
