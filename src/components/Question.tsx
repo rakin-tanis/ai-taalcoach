@@ -47,7 +47,7 @@ const Question: React.FC = () => {
     } catch (error) {
       console.error("Error converting PDF page to image:", error);
     }
-  }, []);
+  }, [questionNumber]);
 
   // Image loading effect
   useEffect(() => {
