@@ -1,12 +1,12 @@
 'use client'
 
-import React, { ChangeEvent, useCallback, useEffect, useState } from 'react';
+import React, { ChangeEvent, useCallback, useEffect, useRef, useState } from 'react';
 import { useEvaluation } from '@/hooks/useEvaluation';
 import usePdfData from '@/hooks/usePdfData';
 import Pagination from './Pagination';
 import MobileDebugger from './MobileDebugger';
 import QuestionImageNavigator from './QuestionImageNavigator';
-import TranscriptInput from './TranscriptInput';
+import UserInput from './UserInput';
 import RecordingControls from './RecordingControls';
 import EvaluationResults from './EvaluationResults';
 
@@ -16,7 +16,9 @@ const Question: React.FC = () => {
   // State management
   const [questionNumber, setQuestionNumber] = useState(1);
   const [transcript, setTranscript] = useState<string>('');
+  const [recording, setRecording] = useState<string>('');
   const [showResults, setShowResults] = useState(false);
+  const recordingRef = useRef('');
 
   // Custom hooks
   const {
@@ -33,6 +35,10 @@ const Question: React.FC = () => {
     loading: imageLoading,
     error: imageError
   } = usePdfData();
+
+  useEffect(() => {
+    recordingRef.current = recording
+  }, [recording])
 
   // Memoized image loading function
   const loadPdfAndConvertPageToImage = useCallback(async () => {
@@ -94,6 +100,12 @@ const Question: React.FC = () => {
     setShowResults(false);
   };
 
+  const onPause = () => {
+    setTranscript(prev => prev + " " + recordingRef.current);
+    recordingRef.current = ""
+    setRecording("")
+  }
+
   return (
     <div className='flex flex-col items-center relative'>
       {/* Image Navigator */}
@@ -116,8 +128,8 @@ const Question: React.FC = () => {
       />
 
       {/* Transcript Input */}
-      <TranscriptInput
-        transcript={transcript}
+      <UserInput
+        input={transcript + (recording ? " " + recording : "")}
         handleChange={handleChange}
       />
 
@@ -125,22 +137,25 @@ const Question: React.FC = () => {
       <RecordingControls
         isLoading={isEvaluating}
         imageLoading={imageLoading}
-        onTranscriptChange={setTranscript}
+        onTranscriptChange={setRecording}
+        onRecordingPause={onPause}
         onSubmit={handleSubmit}
       />
 
       {/* Evaluation Results */}
-      {showResults && (
-        <EvaluationResults
-          isLoading={isEvaluating}
-          evaluationError={evaluationError}
-          data={evaluationData}
-        />
-      )}
+      {
+        showResults && (
+          <EvaluationResults
+            isLoading={isEvaluating}
+            evaluationError={evaluationError}
+            data={evaluationData}
+          />
+        )
+      }
 
       {/* Mobile Debugger for Non-Production */}
       {process.env.NODE_ENV !== 'production' && <MobileDebugger />}
-    </div>
+    </div >
   );
 };
 

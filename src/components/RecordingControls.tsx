@@ -46,6 +46,7 @@ interface RecordingControlsProps {
   isLoading: boolean;
   imageLoading: boolean;
   onTranscriptChange: (transcript: string) => void;
+  onRecordingPause: () => void;
   onSubmit: () => void;
 }
 
@@ -53,6 +54,7 @@ const RecordingControls: React.FC<RecordingControlsProps> = ({
   isLoading,
   imageLoading,
   onTranscriptChange,
+  onRecordingPause,
   onSubmit
 }) => {
   const [isRecording, setIsRecording] = useState(false);
@@ -109,6 +111,7 @@ const RecordingControls: React.FC<RecordingControlsProps> = ({
 
         recognitionInstance.onend = () => {
           setIsRecording(false);
+          onRecordingPause();
 
           // For mobile, restart if still pressing
           if (isMobile && isPressingRef.current) {
